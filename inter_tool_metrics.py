@@ -68,17 +68,29 @@ def main():
                         help='path to all results', required = True)
     parser.add_argument('--output_dir', type=str,
                         help='output directory to store results of metrics.')
+    
     try:
         args = parser.parse_args()
     except:
         parser.print_help()
         sys.exit(0)
 
-    # Load all results from results path
     results_dir = Path(args.results)
-    print(f'Now looking in {results_dir}')
-    all_files = list(results_dir.glob("*.csv"))
-    print(f'Found {len(all_files)} files. ')
+    output_dir = Path(args.output_dir)
+
+    print(f"Input directory:  {results_dir}")
+    print(f"Output directory: {output_dir}")
+
+    # gather _results.csv files
+    all_files = sorted(results_dir.glob("*_results.csv"))
+
+    if not all_files:
+        print("ERROR: No '_results.csv' files found!")
+        sys.exit(1)
+
+    print(f"Found {len(all_files)} files:")
+    for f in all_files:
+        print("  -", f.name)
 
     # save file names
     file_names = [f.stem for f in all_files]
