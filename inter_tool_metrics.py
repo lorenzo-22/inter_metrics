@@ -6,7 +6,7 @@ from scipy.stats import spearmanr
 from itertools import combinations
 from statsmodels.stats.multitest import multipletests
 import numpy as np
-import os
+import os, re
 
 def load_and_process_files(all_files):
     all_results = []
@@ -15,6 +15,12 @@ def load_and_process_files(all_files):
     for f in all_files:
         # Load file
         result = pd.read_csv(f)
+
+        # Workaround for non-equal 
+        if 'P.Value' in result.columns:
+            result = result.rename({'P.Value': 'p_value'}, axis = 1)
+        if 'Unnamed: 0' in result.columns:
+            result = result.set_index('Unnamed: 0')
 
         # FDR-adjust p-values
         _, p_adjusted, _, _ = multipletests(result['p_value'], method='fdr_bh')
@@ -42,8 +48,8 @@ def calculate_metrics(all_results, file_names, pairs, top_n = 50):
 
         # Concordance: number of shared proteins in top
         top_n = 50
-        top1 = set(df1.sort_values('rank').head(top_n)['protein'])
-        top2 = set(df2.sort_values('rank').head(top_n)['protein'])
+        top1 = set(df1.sort_values('rank').head(top_n)['ID'])
+        top2 = set(df2.sort_values('rank').head(top_n)['ID'])
 
         c_score = len(top1 & top2) / top_n
 
@@ -93,23 +99,24 @@ def main():
     for f in all_files:
         print(f)
 
-    # # save file names
-    # file_names = [f.stem for f in all_files]
-    # print(file_names)
+    # save file names
+    file_names = [re.search(r'/methods/([^/]+)/default/', str(f)).group(1) for f in all_files]
+    print(file_names)
 
-    # # Make unique pairs of the runs:
-    # indices = list(range(len(all_files)))
-    # pairs = list(combinations(indices, 2))
+    # Make unique pairs of the runs:
+    indices = list(range(len(all_files)))
+    pairs = list(combinations(indices, 2))
+    print(pairs)
 
-    # # Load files and calculate FDR-adjusted p-value and rank
-    # all_results = load_and_process_files(all_files)
+    # Load files and calculate FDR-adjusted p-value and rank
+    all_results = load_and_process_files(all_files)
     
-    # # Calculate metrics
-    # concordance_df = calculate_metrics(all_results, file_names=file_names, pairs=pairs)
+    # Calculate metrics
+    concordance_df = calculate_metrics(all_results, file_names=file_names, pairs=pairs)
 
-    # print(concordance_df)
+    print(concordance_df)
 
-    # concordance_df.to_csv(os.path.join(args.output_dir, 'concordance_scores.csv'))
+    concordance_df.to_csv(os.path.join(args.output_dir, 'concordance_scores.csv'))
 
 if __name__ == "__main__":
     main()
