@@ -7,6 +7,8 @@ from itertools import combinations
 from statsmodels.stats.multitest import multipletests
 import numpy as np
 import os, re
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 def load_and_process_files(all_files):
     all_results = []
@@ -67,6 +69,29 @@ def calculate_metrics(all_results, file_names, pairs, top_n = 50):
     return concordance_df
 
 
+
+def plot_method_heatmap(df, value_col='rank_cor_rho', title=None, cmap='coolwarm'):
+    """
+    Plots a heatmap of method1 vs method2 colored by value_col.
+    
+    Parameters:
+        df: pandas DataFrame with columns ['method1', 'method2', value_col]
+        value_col: column name to color by
+        title: optional plot title
+        cmap: colormap for heatmap
+    """
+    pivot_df = df.pivot(index='method1', columns='method2', values=value_col)
+    
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(pivot_df, annot=True, fmt=".2f", cmap=cmap, cbar_kws={'label': 'Rank correlation'}, vmin=0, vmax=1)
+    plt.title(title if title else 'Heatmap of rank correlations')
+    plt.xlabel('Tool 1')
+    plt.ylabel('Tool 2')
+    plt.tight_layout()
+
+    return plt
+
+
 def main():
     parser = argparse.ArgumentParser(description='Welch t-test benchmark runner')
 
@@ -117,6 +142,10 @@ def main():
     print(concordance_df)
 
     concordance_df.to_csv(os.path.join(args.output_dir, 'concordance_scores.csv'))
+
+    plot = plot_method_heatmap(concordance_df)
+    plot.savefig(os.path.join(output_dir, 'heatmap_rankcorrelations.png'), dpi = 300)
+
 
 if __name__ == "__main__":
     main()
