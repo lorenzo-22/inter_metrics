@@ -115,6 +115,13 @@ def main():
 
     # gather _results.csv files
     all_files = sorted(results_dir.rglob("*_results.csv"))
+    
+    # If first omnibench run, y
+    if len(all_files) < 2:
+        # write minimal empty CSV so Snakemake is happy
+        pd.DataFrame().to_csv(os.path.join(args.output_dir, 'concordance_scores.csv'), index=False)
+        print("Only one tool found. Skipping pairwise metrics.")
+        sys.exit(0)
 
     if not all_files:
         print("ERROR: No '_results.csv' files found!")
