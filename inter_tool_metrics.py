@@ -141,7 +141,7 @@ def main():
 
     print(concordance_df)
 
-    concordance_df.to_csv(os.path.join(args.output_dir, 'concordance_scores.csv'))
+    concordance_df.to_csv(os.path.join(args.output_dir, 'inter_tool_metrics.concordance_scores.csv'))
 
     plot = plot_method_heatmap(concordance_df)
     plot.savefig(os.path.join(output_dir, 'heatmap_rankcorrelations.png'), dpi = 300)
