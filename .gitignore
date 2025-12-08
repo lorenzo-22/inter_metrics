@@ -2,3 +2,4 @@ out
 .DS_store
 concordance_scores.csv
 heatmap_*
+plotting_report*
