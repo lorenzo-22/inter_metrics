@@ -100,12 +100,12 @@ def plot_method_heatmap(df, value_col='rank_cor_rho', title=None, cmap='coolwarm
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Welch t-test benchmark runner')
+    parser = argparse.ArgumentParser(description='Inter tool metrics')
 
 
     parser.add_argument('--output_dir', type=str,
                         help='output directory to store results of metrics.')
-    parser.add_argument('--input_dir', type = str, help="Input directory, i.e. path to out folder", required=True)
+    # parser.add_argument('--input_dir', type = str, help="Input directory, i.e. path to out folder", required=True)
     
     try:
         args = parser.parse_args()
@@ -113,7 +113,7 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    results_dir = Path(args.input_dir)
+    results_dir = Path(os.path.join(os.getcwd(), 'out'))
     output_dir = Path(args.output_dir)
 
     print(f"Input directory:  {results_dir}")
