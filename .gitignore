@@ -1,4 +1,4 @@
 out
 .DS_store
 concordance_scores.csv
-heatmap_rankcorrelations.png
+heatmap_*
