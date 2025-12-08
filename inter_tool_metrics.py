@@ -102,10 +102,19 @@ def plot_method_heatmap(df, value_col='rank_cor_rho', title=None, cmap='coolwarm
 def main():
     parser = argparse.ArgumentParser(description='Inter tool metrics')
 
+    parser.add_argument('--output_dir', type=str, help='Output directory')
+    parser.add_argument('--input_dir', type=str, help='Input directory', required=False)
 
-    parser.add_argument('--output_dir', type=str,
-                        help='output directory to store results of metrics.')
-    # parser.add_argument('--input_dir', type = str, help="Input directory, i.e. path to out folder", required=True)
+    # Use parse_known_args to safely ignore any other args
+    args, unknown = parser.parse_known_args()
+
+    # Determine output directory
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+    else:
+        output_dir = Path(os.getcwd()) / 'out' / 'inter_metrics'
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     
     try:
         args = parser.parse_args()
@@ -193,6 +202,7 @@ def main():
         plots.append((dataset, fname))
     
     report_path = os.path.join(output_dir, "plotting_report.html")
+
     with open(report_path, "w") as f:
         f.write("<html><head><title>Report</title></head><body>\n")
         f.write("<h1>Heatmaps of Rank Correlations</h1>\n")
