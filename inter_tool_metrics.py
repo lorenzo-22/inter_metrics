@@ -9,6 +9,10 @@ import numpy as np
 import os, re
 import seaborn as sns
 import matplotlib.pyplot as plt
+from collections import defaultdict
+from itertools import product
+
+
 
 def load_and_process_files(all_files):
     all_results = []
@@ -44,18 +48,22 @@ def calculate_metrics(all_results, file_names, pairs, top_n = 50):
     for i, j in pairs:
         df1 = all_results[i].sort_values('rank')
         df2 = all_results[j].sort_values('rank')
-        
+
+        # Make it find any/ corrrect proteincolumn name
+        protein_column_names = ['ID', 'Protein', 'protein', 'id', 'prot', 'gene', 'Gene']
+        df1_id = (col for col in df1.columns if col in protein_column_names)
+        df2_id = (col for col in df2.columns if col in protein_column_names)
+
         # Rank correlation
         rho, pval = spearmanr(df1['rank'], df2['rank'])
 
         # Concordance: number of shared proteins in top
         top_n = 50
-        top1 = set(df1.sort_values('rank').head(top_n)['ID'])
-        top2 = set(df2.sort_values('rank').head(top_n)['ID'])
+        top1 = set(df1.sort_values('rank').head(top_n)[df1_id])
+        top2 = set(df2.sort_values('rank').head(top_n)[df2_id])
 
         c_score = len(top1 & top2) / top_n
 
-        
         rank_correlation.append({
             'method1': file_names[i],
             'method2': file_names[j],
@@ -131,27 +139,50 @@ def main():
     for f in all_files:
         print(f)
 
-    # save file names
-    file_names = [re.search(r'/methods/([^/]+)/default/', str(f)).group(1) for f in all_files]
-    print(file_names)
+    # extract dataset names
+    datasets = list(set(
+        re.search(r'/out/data/([^/]+)/', str(f)).group(1)
+        for f in all_files
+        if re.search(r'/out/data/([^/]+)/', str(f))
+    ))
 
-    # Make unique pairs of the runs:
-    indices = list(range(len(all_files)))
-    pairs = list(combinations(indices, 2))
-    print(pairs)
+    # map dataset -> list of files
+    results_files = defaultdict(list)
 
-    # Load files and calculate FDR-adjusted p-value and rank
-    all_results = load_and_process_files(all_files)
+    for f in all_files:
+        match = re.search(r'/out/data/([^/]+)/', str(f))
+        if match:
+            dataset = match.group(1)
+            results_files[dataset].append(f)
+
+    results_files = dict(results_files)  # if you don't want defaultdict
+    print(results_files)
+
+    concordance_scores = []
+
+    for dataset in datasets:
+        print(f'Now running {dataset}')
+        files = results_files[dataset]
+
+        # Make unique pairs:
+        indices = list(range(len(files)))
+        pairs = list(product(indices, indices))
+
+        # Load files and calculate FDR-adjusted p-value and rank
+        all_results = load_and_process_files(files)
+        file_names = [re.search(r'/methods/([^/]+)/default/', str(f)).group(1) for f in files]
+        
+        # Calculate metrics
+        concordance_df = calculate_metrics(all_results, file_names=file_names, pairs=pairs)
+
+        concordance_scores.append(concordance_df)
     
-    # Calculate metrics
-    concordance_df = calculate_metrics(all_results, file_names=file_names, pairs=pairs)
+    print(concordance_scores)
 
-    print(concordance_df)
-
-    concordance_df.to_csv(os.path.join(args.output_dir, 'concordance_scores.csv'))
-
-    plot = plot_method_heatmap(concordance_df)
-    plot.savefig(os.path.join(output_dir, 'heatmap_rankcorrelations.png'), dpi = 300)
+    for idx in range(len(datasets)):
+        dataset = datasets[idx]
+        plot = plot_method_heatmap(concordance_scores[idx], title=f'Heatmap of rank correlations, dataset: {dataset}')
+        plot.savefig(os.path.join(output_dir, f'heatmap_rankcorrelations_{dataset}.png'), dpi = 300)
 
 
 if __name__ == "__main__":
