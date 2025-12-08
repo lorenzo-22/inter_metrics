@@ -104,6 +104,8 @@ def main():
 
     parser.add_argument('--output_dir', type=str, help='Output directory')
     parser.add_argument('--input_dir', type=str, help='Input directory', required=False)
+    parser.add_argument('--name', type=str, help='name', required=False)
+
 
     # Use parse_known_args to safely ignore any other args
     args, unknown = parser.parse_known_args()
