@@ -77,7 +77,6 @@ def calculate_metrics(all_results, file_names, pairs, top_n = 50):
     return concordance_df
 
 
-
 def plot_method_heatmap(df, value_col='rank_cor_rho', title=None, cmap='coolwarm'):
     """
     Plots a heatmap of method1 vs method2 colored by value_col.
@@ -103,11 +102,10 @@ def plot_method_heatmap(df, value_col='rank_cor_rho', title=None, cmap='coolwarm
 def main():
     parser = argparse.ArgumentParser(description='Welch t-test benchmark runner')
 
-    # parser.add_argument('--results', type=str,
-    #                     help='path to all results', required = True)
+
     parser.add_argument('--output_dir', type=str,
                         help='output directory to store results of metrics.')
-    
+    parser.add_argument('--input_dir', type = str, help="Input directory, i.e. path to out folder", required=True)
     
     try:
         args = parser.parse_args()
@@ -115,7 +113,7 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    results_dir = Path(os.path.join(os.getcwd(), 'out'))
+    results_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir)
 
     print(f"Input directory:  {results_dir}")
@@ -141,21 +139,22 @@ def main():
 
     # extract dataset names
     datasets = list(set(
-        re.search(r'/out/data/([^/]+)/', str(f)).group(1)
+        re.search(r'/data/([^/]+)/', str(f)).group(1)
         for f in all_files
-        if re.search(r'/out/data/([^/]+)/', str(f))
+        if re.search(r'/data/([^/]+)/', str(f))
     ))
 
     # map dataset -> list of files
     results_files = defaultdict(list)
 
     for f in all_files:
-        match = re.search(r'/out/data/([^/]+)/', str(f))
+        match = re.search(r'/data/([^/]+)/', str(f))
         if match:
             dataset = match.group(1)
             results_files[dataset].append(f)
 
     results_files = dict(results_files)  # if you don't want defaultdict
+    print('results files')
     print(results_files)
 
     concordance_scores = []
@@ -183,6 +182,7 @@ def main():
         dataset = datasets[idx]
         plot = plot_method_heatmap(concordance_scores[idx], title=f'Heatmap of rank correlations, dataset: {dataset}')
         plot.savefig(os.path.join(output_dir, f'heatmap_rankcorrelations_{dataset}.png'), dpi = 300)
+
 
 
 if __name__ == "__main__":
