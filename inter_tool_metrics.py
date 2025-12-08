@@ -207,10 +207,13 @@ def main():
 
     with open(report_path, "w") as f:
         f.write("<html><head><title>Report</title></head><body>\n")
+
         f.write("<h1>Heatmaps of Rank Correlations</h1>\n")
 
         for dataset, fname in plots:
             f.write(f"<h2>{dataset}</h2>\n")
+            df = concordance_scores[idx]  # assumes concordance_scores[idx] is a DataFrame
+            f.write(df.to_html(index=False, border=1))  # render HTML table
             f.write(f'<img src="{fname}" style="max-width:800px;"><br><br>\n')
 
         f.write("</body></html>\n")
