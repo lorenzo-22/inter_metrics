@@ -178,12 +178,30 @@ def main():
     
     print(concordance_scores)
 
-    for idx in range(len(datasets)):
-        dataset = datasets[idx]
-        plot = plot_method_heatmap(concordance_scores[idx], title=f'Heatmap of rank correlations, dataset: {dataset}')
-        plot.savefig(os.path.join(output_dir, f'heatmap_rankcorrelations_{dataset}.png'), dpi = 300)
+    plots = []
 
+    for idx, dataset in enumerate(datasets):
+        fig = plot_method_heatmap(
+            concordance_scores[idx],
+            title=f'Heatmap of rank correlations, dataset: {dataset}'
+        )
 
+        fname = f"heatmap_rankcorrelations_{dataset}.png"
+        fpath = os.path.join(output_dir, fname)
+        fig.savefig(fpath, dpi=300)
+
+        plots.append((dataset, fname))
+    
+    report_path = os.path.join(output_dir, "plotting_report.html")
+    with open(report_path, "w") as f:
+        f.write("<html><head><title>Report</title></head><body>\n")
+        f.write("<h1>Heatmaps of Rank Correlations</h1>\n")
+
+        for dataset, fname in plots:
+            f.write(f"<h2>{dataset}</h2>\n")
+            f.write(f'<img src="{fname}" style="max-width:800px;"><br><br>\n')
+
+        f.write("</body></html>\n")
 
 if __name__ == "__main__":
     main()
