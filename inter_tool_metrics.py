@@ -155,10 +155,17 @@ def main():
     # -----------------------------------------------------------------------
     all_files = sorted(results_dir.rglob("*_results.csv"))
     
-    # If first omnibench run, y
+    # If first omnibench run, create empty outputs
     if len(all_files) < 2:
         # write minimal empty CSV so Snakemake is happy
         pd.DataFrame().to_csv(os.path.join(args.output_dir, 'concordance_scores.csv'), index=False)
+        # Also create empty HTML file
+        report_path = os.path.join(args.output_dir, "plotting_report.html")
+        with open(report_path, "w") as f:
+            f.write("<html><head><title>Report</title></head><body>\n")
+            f.write("<h1>Inter-tool Metrics Report</h1>\n")
+            f.write("<p>Only one method found. At least 2 methods are needed for inter-tool comparison.</p>\n")
+            f.write("</body></html>\n")
         print("Only one tool found. Skipping pairwise metrics.")
         sys.exit(0)
 
