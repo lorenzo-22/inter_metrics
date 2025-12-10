@@ -2,7 +2,7 @@ from pathlib import Path
 import pandas as pd
 import sys
 import argparse
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, kendalltau
 from itertools import combinations
 from statsmodels.stats.multitest import multipletests
 import numpy as np
@@ -34,6 +34,7 @@ def load_and_process_files(all_files):
 
         # Make importance score
         result['importance'] = np.abs(result['effect_size']) * -np.log10(result['p_adjusted'] + 1e-10)
+        result = result.sort_values('importance')
 
         # Rank
         result['rank'] = result['importance'].rank(method='min', ascending=False)
@@ -46,16 +47,29 @@ def calculate_metrics(all_results, file_names, pairs, top_n = 50):
     rank_correlation = []
 
     for i, j in pairs:
-        df1 = all_results[i].sort_values('rank')
-        df2 = all_results[j].sort_values('rank')
+        df1 = all_results[i]#.sort_values('rank')
+        df2 = all_results[j]#.sort_values('rank')
 
         # Make it find any/ corrrect proteincolumn name
         protein_column_names = ['ID', 'Protein', 'protein', 'id', 'prot', 'gene', 'Gene']
-        df1_id = (col for col in df1.columns if col in protein_column_names)
-        df2_id = (col for col in df2.columns if col in protein_column_names)
+        # Find the first column in df1 that matches
+        df1_id = next((col for col in df1.columns if col in protein_column_names), None)
+        df2_id = next((col for col in df2.columns if col in protein_column_names), None)
 
-        # Rank correlation
-        rho, pval = spearmanr(df1['rank'], df2['rank'])
+        if df1_id is None or df2_id is None:
+            raise ValueError("No valid protein ID column found in one of the datasets")
+
+        # Merge the two dataframes on protein ID
+        merged = pd.merge(
+            df1, 
+            df2, 
+            left_on=df1_id, right_on=df2_id,
+            suffixes=('_A', '_B')
+        )
+
+        # Compute correlations on aligned importance values
+        rho, pval = spearmanr(merged['importance_A'], merged['importance_B'], nan_policy='omit')
+        kendall_corr, kendall_pval = kendalltau(merged['importance_A'], merged['importance_B'], nan_policy='omit')
 
         # Concordance: number of shared proteins in top
         top_n = 50
@@ -68,8 +82,10 @@ def calculate_metrics(all_results, file_names, pairs, top_n = 50):
             'method1': file_names[i],
             'method2': file_names[j],
             f'c_score_top{top_n}': c_score, 
-            'rank_cor_rho': rho,
-            'rank_cor_pval': pval
+            'spearmanr_corr_rho': rho,
+            'spearmanr_pval': pval, 
+            'kendall_corr': kendall_corr, 
+            'kendall_pval': kendall_pval
             })
         
     concordance_df = pd.DataFrame(rank_correlation)
@@ -77,7 +93,7 @@ def calculate_metrics(all_results, file_names, pairs, top_n = 50):
     return concordance_df
 
 
-def plot_method_heatmap(df, value_col='rank_cor_rho', title=None, cmap='coolwarm'):
+def plot_method_heatmap(df, value_col='spearmanr_corr_rho', title=None, cmap='coolwarm'):
     """
     Plots a heatmap of method1 vs method2 colored by value_col.
     
@@ -100,6 +116,9 @@ def plot_method_heatmap(df, value_col='rank_cor_rho', title=None, cmap='coolwarm
 
 
 def main():
+    # -----------------------------------------------------------------------
+    # Load and parse
+    # -----------------------------------------------------------------------
     parser = argparse.ArgumentParser(description='Inter tool metrics')
 
     parser.add_argument('--output_dir', type=str, help='Output directory')
@@ -130,20 +149,16 @@ def main():
     print(f"Input directory:  {results_dir}")
     print(f"Output directory: {output_dir}")
 
-    # gather _results.csv files
+
+    # -----------------------------------------------------------------------
+    # Extract results files from path names
+    # -----------------------------------------------------------------------
     all_files = sorted(results_dir.rglob("*_results.csv"))
     
-    # If first omnibench run, create empty outputs
+    # If first omnibench run, y
     if len(all_files) < 2:
         # write minimal empty CSV so Snakemake is happy
         pd.DataFrame().to_csv(os.path.join(args.output_dir, 'concordance_scores.csv'), index=False)
-        # Also create empty HTML file
-        report_path = os.path.join(args.output_dir, "plotting_report.html")
-        with open(report_path, "w") as f:
-            f.write("<html><head><title>Report</title></head><body>\n")
-            f.write("<h1>Inter-tool Metrics Report</h1>\n")
-            f.write("<p>Only one method found. At least 2 methods are needed for inter-tool comparison.</p>\n")
-            f.write("</body></html>\n")
         print("Only one tool found. Skipping pairwise metrics.")
         sys.exit(0)
 
@@ -151,18 +166,14 @@ def main():
         print("ERROR: No '_results.csv' files found!")
         sys.exit(1)
 
-    print(f"Found {len(all_files)} files:")
-    for f in all_files:
-        print(f)
-
     # extract dataset names
-    datasets = list(set(
+    dataset_names = list(set(
         re.search(r'/data/([^/]+)/', str(f)).group(1)
         for f in all_files
         if re.search(r'/data/([^/]+)/', str(f))
     ))
 
-    # map dataset -> list of files
+    # Make dictionary of which files belong to which dataset
     results_files = defaultdict(list)
 
     for f in all_files:
@@ -171,14 +182,14 @@ def main():
             dataset = match.group(1)
             results_files[dataset].append(f)
 
-    results_files = dict(results_files)  # if you don't want defaultdict
-    print('results files')
-    print(results_files)
+    results_files = dict(results_files)
 
     concordance_scores = []
 
-    for dataset in datasets:
-        print(f'Now running {dataset}')
+    # -----------------------------------------------------------------------------------
+    # Load datasets and calculate metrics
+    # -----------------------------------------------------------------------------------
+    for dataset in dataset_names:
         files = results_files[dataset]
 
         # Make unique pairs:
@@ -187,41 +198,58 @@ def main():
 
         # Load files and calculate FDR-adjusted p-value and rank
         all_results = load_and_process_files(files)
+
         file_names = [re.search(r'/methods/([^/]+)/default/', str(f)).group(1) for f in files]
         
         # Calculate metrics
+        print(f"Running dataset: {dataset}")
         concordance_df = calculate_metrics(all_results, file_names=file_names, pairs=pairs)
 
         concordance_scores.append(concordance_df)
+        print(concordance_df)
     
-    print(concordance_scores)
+    # -----------------------------------------------------------------------------------
+    # Make heatmaps and save in HTML
+    # -----------------------------------------------------------------------------------
 
     plots = []
+    plots_kendall = []
 
-    for idx, dataset in enumerate(datasets):
+    for idx, dataset in enumerate(dataset_names):
         fig = plot_method_heatmap(
             concordance_scores[idx],
-            title=f'Heatmap of rank correlations, dataset: {dataset}'
+            title=f'Heatmap of rank correlations (Spearman), dataset: {dataset}'
         )
 
-        fname = f"heatmap_rankcorrelations_{dataset}.png"
+        fname = f"heatmap_rankcorrelations_spearman_{dataset}.png"
         fpath = os.path.join(output_dir, fname)
         fig.savefig(fpath, dpi=300)
-
         plots.append((dataset, fname))
+
+        fig = plot_method_heatmap(
+            concordance_scores[idx],
+            title=f'Heatmap of rank correlations (Kendall Tau), dataset: {dataset}', 
+            value_col='kendall_corr'
+        )
+
+        fname_kendall = f"heatmap_rankcorrelations_kendall_{dataset}.png"
+        fpath_kendall = os.path.join(output_dir, fname_kendall)
+        fig.savefig(fpath_kendall, dpi=300)
+        plots_kendall.append((dataset, fname_kendall))
     
     report_path = os.path.join(output_dir, "plotting_report.html")
 
     with open(report_path, "w") as f:
         f.write("<html><head><title>Report</title></head><body>\n")
 
-        f.write("<h1>Heatmaps of Rank Correlations</h1>\n")
+        f.write("<h1>Comparisons of results (inter tool metrics)</h1>\n")
 
         for dataset, fname in plots:
             f.write(f"<h2>{dataset}</h2>\n")
             df = concordance_scores[idx]  # assumes concordance_scores[idx] is a DataFrame
             f.write(df.to_html(index=False, border=1))  # render HTML table
             f.write(f'<img src="{fname}" style="max-width:800px;"><br><br>\n')
+            f.write(f'<img src="{fname_kendall}" style="max-width:800px;"><br><br>\n')
 
         f.write("</body></html>\n")
 
