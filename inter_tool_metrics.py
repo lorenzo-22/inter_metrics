@@ -68,8 +68,15 @@ def calculate_metrics(all_results, file_names, pairs, top_n = 50):
         )
 
         # Compute correlations on aligned importance values
-        rho, pval = spearmanr(merged['importance_A'], merged['importance_B'], nan_policy='omit')
-        kendall_corr, kendall_pval = kendalltau(merged['importance_A'], merged['importance_B'], nan_policy='omit')
+        # Special case: if comparing method to itself, correlation is exactly 1.0
+        if i == j:
+            rho = 1.0
+            pval = 0.0
+            kendall_corr = 1.0
+            kendall_pval = 0.0
+        else:
+            rho, pval = spearmanr(merged['importance_A'], merged['importance_B'], nan_policy='omit')
+            kendall_corr, kendall_pval = kendalltau(merged['importance_A'], merged['importance_B'], nan_policy='omit')
 
         # Concordance: number of shared proteins in top
         top_n = 50
@@ -207,6 +214,12 @@ def main():
 
         concordance_scores.append(concordance_df)
         print(concordance_df)
+    
+    # Save concordance scores to CSV
+    all_concordance = pd.concat(concordance_scores, ignore_index=True)
+    concordance_path = os.path.join(output_dir, 'concordance_scores.csv')
+    all_concordance.to_csv(concordance_path, index=False)
+    print(f"Concordance scores saved to: {concordance_path}")
     
     # -----------------------------------------------------------------------------------
     # Make heatmaps and save in HTML
