@@ -122,9 +122,9 @@ def main():
     parser = argparse.ArgumentParser(description='Inter tool metrics')
 
     parser.add_argument('--output_dir', type=str, help='Output directory')
+    parser.add_argument('--results', type=str, nargs='+', help='Results files', required=False)
     parser.add_argument('--input_dir', type=str, help='Input directory', required=False)
     parser.add_argument('--name', type=str, help='name', required=False)
-
 
     # Use parse_known_args to safely ignore any other args
     args, unknown = parser.parse_known_args()
@@ -136,27 +136,24 @@ def main():
         output_dir = Path(os.getcwd()) / 'out' / 'inter_metrics'
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    
-    try:
-        args = parser.parse_args()
-    except:
-        parser.print_help()
-        sys.exit(0)
-
-    results_dir = Path(os.path.join(os.getcwd(), 'out'))
-    output_dir = Path(args.output_dir)
-
-    print(f"Input directory:  {results_dir}")
     print(f"Output directory: {output_dir}")
 
-
     # -----------------------------------------------------------------------
-    # Extract results files from path names
+    # Get results files - either from arguments or search
     # -----------------------------------------------------------------------
-    all_files = sorted(results_dir.rglob("*_results.csv"))
-    
-    # Filter to only include cancer dataset
-    all_files = [f for f in all_files if '/data/cancer/' in str(f)]
+    if args.results:
+        # Files passed as arguments (from OmniBenchmark metric_collector)
+        all_files = [Path(f) for f in args.results]
+        # Filter to only include cancer dataset
+        all_files = [f for f in all_files if '/data/cancer/' in str(f)]
+        all_files = sorted(all_files)
+    else:
+        # Search for files (for standalone execution)
+        results_dir = Path(os.path.join(os.getcwd(), 'out'))
+        print(f"Input directory:  {results_dir}")
+        all_files = sorted(results_dir.rglob("*_results.csv"))
+        # Filter to only include cancer dataset
+        all_files = [f for f in all_files if '/data/cancer/' in str(f)]
     
     # If first omnibench run, create empty outputs
     if len(all_files) < 2:
