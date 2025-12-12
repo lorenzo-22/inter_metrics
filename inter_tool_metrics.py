@@ -160,7 +160,7 @@ def main():
         print(f"Input directory:  {results_dir}")
         all_files = sorted(results_dir.rglob("*_results.csv"))
         # Filter to only include cancer dataset
-        all_files = [f for f in all_files if '/data/cancer/' in str(f)]
+        # all_files = [f for f in all_files if '/data/cancer/' in str(f)]
     
     # If first omnibench run, create empty outputs
     if len(all_files) < 2:
